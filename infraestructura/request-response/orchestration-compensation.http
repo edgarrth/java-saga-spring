@@ -1,0 +1,7 @@
+POST http://localhost:8080/payments/v1/orchestrated-payments
+Content-Type: application/json
+
+{
+  "amount": 6000.00,
+  "currency": "USD"
+}

@@ -1,0 +1,2 @@
+-- Datos opcionales para consultas iniciales. Flyway crea las tablas al iniciar la aplicación.
+-- Si quieres insertar datos manualmente luego de iniciar la app, ejecuta sample-events.sql.
