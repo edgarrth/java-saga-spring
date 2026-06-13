@@ -6,7 +6,6 @@
     <artifactId>spring-saga-dual-patterns-poc</artifactId>
     <version>1.0.0</version>
     <name>spring-saga-dual-patterns-poc</name>
-    <description>PoC Saga orchestration and choreography without Axon</description>
     <properties>
         <java.version>25</java.version>
         <spring-boot.version>4.0.7</spring-boot.version>
