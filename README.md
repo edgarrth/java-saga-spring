@@ -1,6 +1,6 @@
-# PoC Saga Orquestación y Coreografía sin Axon
+# PoC Saga Orquestación y Coreografía
 
-PoC en **Java 25** y **Spring Boot** para comparar dos formas de implementar Saga en un caso de **payment processing** sin usar Axon Framework ni Axon Server.
+PoC en **Java 25** y **Spring Boot** para comparar dos formas de implementar Saga en un caso de **payment processing**.
 
 Incluye:
 
@@ -268,4 +268,3 @@ settlement-service
 payment-orchestrator-service
 ```
 
-La diferencia clave es que aquí el proyecto muestra ambos patrones sin introducir frameworks de Saga externos.
