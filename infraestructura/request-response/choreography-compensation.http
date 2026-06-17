@@ -1,0 +1,7 @@
+POST http://localhost:8080/payments/v1/choreographed-payments
+Content-Type: application/json
+
+{
+  "amount": 9000.00,
+  "currency": "USD"
+}

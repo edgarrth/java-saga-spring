@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: spring-saga-dual-patterns-poc
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payments_db
+    username: payments
+    password: payments
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: payment-saga-poc
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+server:
+  port: 8080
+app:
+  topics:
+    payment-events: payment.events
+  fraud:
+    reject-above: 5000.00
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
