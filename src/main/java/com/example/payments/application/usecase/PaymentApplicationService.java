@@ -4,6 +4,7 @@ import com.example.payments.application.ports.in.PaymentCommandUseCase;
 import com.example.payments.application.ports.out.*;
 import com.example.payments.domain.commands.*;
 import com.example.payments.domain.events.*;
+import com.example.payments.domain.exceptions.FraudRejectedException;
 import com.example.payments.domain.model.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,7 +32,9 @@ public class PaymentApplicationService implements PaymentCommandUseCase {
         payments.save(payment);
         var event = new PaymentCreatedEvent(UUID.randomUUID(), payment.paymentId(), payment.amount(), payment.currency(), payment.mode().name(), Instant.now());
         eventStore.append(event);
-        publisher.publishOutbox(event);
+        if (payment.mode() == SagaType.CHOREOGRAPHY) {
+            publisher.publishOutbox(event);
+        }
         return payment.paymentId();
     }
 
@@ -42,16 +45,27 @@ public class PaymentApplicationService implements PaymentCommandUseCase {
         emit(new FundsReservedEvent(UUID.randomUUID(), command.paymentId(), Instant.now()), payment.mode());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = FraudRejectedException.class)
     public void validateFraud(ValidateFraudCommand command) {
         var payment = find(command.paymentId());
         if (payment.amount().compareTo(rejectAbove) > 0) {
-            payment.rejectFraud("Amount exceeds fraud threshold " + rejectAbove); payments.save(payment);
-            emit(new FraudRejectedEvent(UUID.randomUUID(), command.paymentId(), payment.failureReason(), Instant.now()), payment.mode());
-        } else {
-            payment.approveFraud(); payments.save(payment);
-            emit(new FraudApprovedEvent(UUID.randomUUID(), command.paymentId(), Instant.now()), payment.mode());
+            String reason = "Amount exceeds fraud threshold " + rejectAbove;
+            payment.rejectFraud(reason);
+            payments.save(payment);
+            emit(new FraudRejectedEvent(UUID.randomUUID(), command.paymentId(), reason, Instant.now()), payment.mode());
+
+            // Choreography continues through the FraudRejectedEvent. Orchestration
+            // needs an immediate business signal so it can start compensation, but
+            // the fraud decision/event must remain committed.
+            if (payment.mode() == SagaType.ORCHESTRATION) {
+                throw new FraudRejectedException(reason);
+            }
+            return;
         }
+
+        payment.approveFraud();
+        payments.save(payment);
+        emit(new FraudApprovedEvent(UUID.randomUUID(), command.paymentId(), Instant.now()), payment.mode());
     }
 
     @Transactional

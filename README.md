@@ -171,6 +171,22 @@ Desde la raíz:
 mvn clean spring-boot:run
 ```
 
+Al iniciar, **Flyway ejecuta automáticamente** las migraciones de `src/main/resources/db/migration` antes de que Hibernate valide el esquema. La migración `V1__init.sql` crea `payments`, `saga_instances`, `event_store` y `outbox_events`.
+
+La integración con Kafka usa `spring-boot-starter-kafka`, requerido por la modularización de Spring Boot 4 para cargar `KafkaAutoConfiguration`, crear `KafkaTemplate` y configurar los `@KafkaListener` a partir de `spring.kafka.*`.
+
+Si vienes de una ejecución anterior que dejó un volumen de PostgreSQL inconsistente, reinicia únicamente el entorno local de la PoC una vez:
+
+```bash
+cd infraestructura/docker
+docker compose down -v
+docker compose up -d
+cd ../..
+mvn spring-boot:run
+```
+
+> `docker compose down -v` elimina los datos locales del PostgreSQL de esta PoC. No lo uses si agregaste datos que necesites conservar.
+
 La aplicación levanta en:
 
 ```text
@@ -268,3 +284,62 @@ settlement-service
 payment-orchestrator-service
 ```
 
+
+## Validación del proyecto
+
+Antes de levantar la aplicación, valida el build y las pruebas unitarias. También se valida que la auto-configuración de Flyway de Spring Boot 4 esté presente y que `V1__init.sql` contenga las cuatro tablas JPA:
+
+```bash
+mvn clean test
+```
+
+Luego levanta la infraestructura y ejecuta la aplicación:
+
+```bash
+cd infraestructura/docker
+docker compose up -d
+cd ../..
+mvn spring-boot:run
+```
+
+> Importante: extrae este ZIP en una carpeta nueva. No lo descomprimas encima de una versión anterior del proyecto, porque podrían quedar fuentes obsoletos (por ejemplo, configuraciones antiguas de Jackson) que Maven también intentará compilar.
+
+## Kafka event envelope and DLT
+
+Kafka messages on `payment.events` use an explicit envelope:
+
+```json
+{
+  "eventType": "PaymentCreatedEvent",
+  "payload": "{...domain event json...}"
+}
+```
+
+The outbox stores the event type and domain payload separately and builds this envelope only when publishing to Kafka. The row is marked `published=true` only after Kafka acknowledges the send.
+
+Malformed messages or messages produced by older versions that do not contain `eventType`/`payload` are moved to `payment.events.DLT` and acknowledged, preventing a poison record from blocking `payment.events` indefinitely.
+
+For a completely clean local functional test after upgrading from v4, reset the PoC infrastructure:
+
+```bash
+cd infraestructura/docker
+docker compose down -v
+docker compose up -d
+cd ../..
+mvn clean test
+mvn spring-boot:run
+```
+
+## v6 - Transacciones locales en la Saga de orquestación
+
+La orquestación no se ejecuta dentro de una única transacción ACID. El método
+`startOrchestratedPayment` usa `Propagation.NOT_SUPPORTED` y cada comando de
+`PaymentApplicationService` mantiene su propia transacción local.
+
+Cuando fraude rechaza un pago de orquestación, `validateFraud` persiste
+`FRAUD_REJECTED` y su evento, y luego lanza `FraudRejectedException` con
+`noRollbackFor`. El orquestador recibe esa señal y ejecuta las compensaciones
+`releaseFunds` y `cancel` en transacciones independientes. El resultado esperado
+para un monto superior a `app.fraud.reject-above` es HTTP 201 con el pago en
+`CANCELLED` y la saga en `COMPENSATED`; no debe aparecer
+`Transaction silently rolled back because it has been marked as rollback-only`.

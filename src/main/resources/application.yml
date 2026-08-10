@@ -27,6 +27,7 @@ server:
 app:
   topics:
     payment-events: payment.events
+    payment-events-dlt: payment.events.DLT
   fraud:
     reject-above: 5000.00
 management:
