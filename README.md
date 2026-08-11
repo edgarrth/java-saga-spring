@@ -330,7 +330,7 @@ mvn clean test
 mvn spring-boot:run
 ```
 
-## v6 - Transacciones locales en la Saga de orquestación
+## Transacciones locales en la Saga de orquestación
 
 La orquestación no se ejecuta dentro de una única transacción ACID. El método
 `startOrchestratedPayment` usa `Propagation.NOT_SUPPORTED` y cada comando de
